@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 2: backend + frontend E2E validation of Soul Threading Smart AI IMG2Garment Mapper. Backend pytest suite extended (24 tests) — 100% pass on public URL (https://garment-ai-map.preview.emergentagent.com). Frontend loads with all six panels + AI Model Manager. Full end-to-end pipeline (upload → analyze → select garment → map → composed panels + quality gauge + guides tab + download ZIP) works when driven through the DOM. However, a critical UI/UX issue was found: the 'Made with Emergent' badge overlays the ActionBar buttons (btn-map + btn-download) in the bottom-right corner, intercepting real mouse clicks. Programmatic (JS) clicks work; real user clicks land on the badge anchor. This will make the app effectively unusable via mouse until the ActionBar is repositioned or given higher z-index.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/map & /api/jobs/{id}", "issue": "composed_panels is a LIST of panel keys (not a dict). Currently works with frontend (which iterates over the list). Consumers should be aware."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ActionBar (footer)", "issue": "'Made with Emergent' branding badge (<a> element) overlays btn-map and btn-download at bottom-right of the viewport. document.elementFromPoint at the center of [data-testid=\"btn-map\"] returns <A> (the badge) instead of <button>. Real mouse clicks are captured by the badge and never fire the map/download actions. Programmatic .click() bypasses this and confirms both buttons work perfectly.", "selector": "[data-testid=\"btn-map\"], [data-testid=\"btn-download\"]", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "GarmentGrid (Panel 03)", "issues": ["Bottom of the tile list is clipped by the ActionBar footer — some tiles cut off at ~y=515 (e.g. Oversized Hoodie tile only partly visible without scrolling); consider padding-bottom on scrollable grid to avoid overlap."]},
+      {"screen": "MasterPreview subtitle", "issues": ["Uses `job.product_name` but the API returns `product_id`; check that `product_name` exists on job response — otherwise subtitle shows undefined."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Prevent the 'Made with Emergent' badge from overlapping the ActionBar buttons. Options: (a) add right-padding/margin to ActionBar so buttons sit left of the badge, (b) raise the ActionBar's z-index above the badge, or (c) move btn-map / btn-download away from bottom-right corner. Without this fix, the Run Mapping and Download ZIP buttons are non-functional for real users.",
+    "Add bottom padding to Panel 03 GarmentGrid scroll container so tiles are not clipped by the ActionBar.",
+    "Verify `job.product_name` exists on /api/map response (frontend reads it in MasterPreview subtitle) — the payload returned by backend contains `product_id`; add `product_name` from garment_db to keep subtitle populated."
+  ],
+  "critical_code_review_comments": [
+    "server.py `_prune_jobs()` only runs on POST /api/map — JOB_STORE and ARTWORK_STORE can grow unbounded via other flows. Add LRU/max-size cap.",
+    "vision_smart_hint failure is swallowed as {'error': str(e)} with no logger.warning — add observability.",
+    "@app.on_event('shutdown') is deprecated in newer FastAPI — migrate to lifespan handlers.",
+    "/api/upload-artwork accepts any bytes as long as magic header sniffs match (or content_type is valid). Consider PIL.Image.verify() after storing to reject truncated/corrupt files.",
+    "Frontend usePolledFetch's name is misleading — it fetches once on mount (no polling). Rename or actually poll if that was the intent (model-status can change over time).",
+    "MasterPreview passes `panels` (list of strings) to renderers — works, but subtitle references `job.product_name` which is not part of API response. Guard against undefined or add the field.",
+    "Frontend upload panel's error handling only shows detail, but on non-4xx errors it fails silently — add generic fallback text."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (24/24)", "frontend": "Functional flow: 100% (via JS click). Real-user-clickability: FAILS due to badge overlay on ActionBar buttons"},
+  "test_credentials": "none required — no auth",
+  "seed_data_creation": "Synthetic portrait & scene JPEGs generated in tests via PIL — no persistent seed data.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend suite at /app/backend/tests/backend_test.py is deterministic, ~34s with pytest-xdist. Added TestAdditionalGarments class covering cargo_loose_shorts_design_template (back-only) and blade_collar_polo_shirt_design_template. Frontend E2E was verified by dispatching JS clicks on btn-map and garment tiles — real Playwright hover-and-click on btn-map fails because of the Emergent branding badge iframe/anchor overlaying it. When retesting after fix, use normal `page.click([data-testid=\"btn-map\"])` (no force=True) — if fixed, it should succeed. LLM smart_hint is exhausted; pipeline gracefully falls back (analysis.smart_hint field contains {error: ...}).",
+  "rca of the issue": "Root cause of critical frontend UI bug: the ActionBar footer places `btn-map` (Run Mapping) and `btn-download` (Download ZIP) in the bottom-right corner of the viewport at approximately x=1763-1903, y=1036-1072. The Emergent preview environment injects a persistent 'Made with Emergent' branding anchor tag at x=1762-1888, y=1034-1054 — directly overlapping the buttons. When a real user (or Playwright with default mouse-click actionability) clicks that region, hit-testing (document.elementFromPoint) returns the <A> badge, which either opens an external link or absorbs the click. The buttons never receive the pointerdown/click events. Reproduction: 1) Open app, upload artwork, run analyze, select garment. 2) Click 'run mapping' button with a real mouse — nothing happens; no /api/map network call fires. 3) Confirm via devtools: `document.elementFromPoint(btnRect.left+btnRect.width/2, btnRect.top+btnRect.height/2)` returns the branding <a>. Mitigation options for main agent: (a) add `padding-right: 160px` to ActionBar or wrap buttons in a container with `margin-right: 160px` to sit left of the badge; (b) set ActionBar CSS `z-index: 100` (badge appears to be z-index ~50); (c) relocate the primary actions to a floating button in the top-right or in the panel bodies instead of the corner. Any of these will restore clickability. Same fix also improves the GarmentGrid clipping."
+}
