@@ -1,0 +1,42 @@
+ruleset_name: Universal Deterministic AOP Mapper Ruleset v1
+created_utc: '2026-06-29T17:12:58.699394+00:00'
+contract: Template masks define geometry; AI/CV ranks artwork content; deterministic
+  rules constrain mapping and validate output.
+universal_rules:
+- id: UR-001
+  rule: Protected focal content cannot be placed in seam/blur/bleed/fold/hem/cuff/collar/placket/zipper/pocket/crotch/panel-boundary
+    risk zones.
+- id: UR-002
+  rule: Fill the entire full-bleed production shape; no blank bleed.
+- id: UR-003
+  rule: Faces, eyes, readable text, logos, and hero features must fit inside safe
+    print area.
+- id: UR-004
+  rule: A focal can span panels only if adjacent panels complete it cleanly and no
+    protected feature is cut by the join.
+- id: UR-005
+  rule: Overlay pockets must use exact underlying source art region; random similar
+    crop fails.
+- id: UR-006
+  rule: Back panels default to supporting continuation; no random duplicate people.
+- id: UR-007
+  rule: Cuffs/waistbands/collars/plackets/labels/facings use texture/low-detail continuation
+    only.
+- id: UR-008
+  rule: If assembled garment looks chopped, amputated, or accidental, reject and retry.
+quality_gate:
+  minimum_scores:
+    focal_completeness: 8
+    seam_safety: 8
+    pocket_underlay_continuity: 8
+    overall: 75
+  hard_fails:
+  - face_cut
+  - eyes_cut
+  - text_cut
+  - logo_cut
+  - pocket_blocks_focal
+  - pocket_not_underlay_matched
+  - blank_bleed
+  - random_back_duplicate_person
+  - mockup_looks_chopped

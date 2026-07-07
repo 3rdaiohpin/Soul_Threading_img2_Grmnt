@@ -1,0 +1,8 @@
+{
+  "title": "AOP Deterministic Garment Manifest Schema",
+  "type": "object",
+  "required": [
+    "schema_name",
+    "products"
+  ]
+}

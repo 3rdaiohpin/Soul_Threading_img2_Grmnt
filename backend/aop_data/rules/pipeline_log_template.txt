@@ -1,0 +1,57 @@
+AOP MAPPING DECISION LOG TEMPLATE
+
+1. Main focal point identification
+- Tool used:
+- Method used:
+- Why chosen:
+- What it detected:
+- Decision from detection:
+- What was rejected and why:
+
+2. Secondary/supporting focal ranking
+- Tool used:
+- Method used:
+- Why chosen:
+- Ranking:
+- Decision from ranking:
+- What was rejected and why:
+
+3. Safe/bleed/seam/fold handling
+- Tool used:
+- Method used:
+- Detected zones:
+- Protected content decision:
+- What was rejected and why:
+
+4. Garment-piece assignment
+- Piece ID:
+- Image section assigned:
+- Why assigned:
+- Risk-zone result:
+- What was rejected and why:
+
+5. One-panel vs multi-panel focal decision
+- Candidate panels:
+- Completion test:
+- Seam test:
+- Decision:
+- What was rejected and why:
+
+6. Chopped-looking prevention
+- Checks run:
+- Corrections/retries:
+- Pass/fail:
+
+7. Pocket continuity
+- Pocket piece:
+- Underlying target location:
+- Exact source region copied:
+- Underlay score:
+- Corrections/retries:
+- Pass/fail:
+
+8. Final acceptance
+- Scores:
+- Hard-fail scan:
+- Why accepted:
+- Remaining limitations:

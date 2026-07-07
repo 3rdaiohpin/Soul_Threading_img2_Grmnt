@@ -1,0 +1,15 @@
+# Smart AI analysis layer requirements for best-result Hugging Face GPU / ZeroGPU build.
+# Install this file *in addition to* backend/requirements.txt when the Space has GPU.
+
+torch
+torchvision
+transformers
+accelerate
+safetensors
+huggingface_hub
+mediapipe
+easyocr
+
+# Optional depending on the exact GPU image / CUDA setup:
+# segment-anything
+# groundingdino-py

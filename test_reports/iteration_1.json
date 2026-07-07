@@ -1,0 +1,36 @@
+{
+  "summary": "Backend testing for Soul Threading Smart AI IMG2Garment Mapper. Created pytest suite at /app/backend/tests/backend_test.py covering health, model-status, rules, garment catalog (list + detail + template PNG), upload-artwork (valid + empty rejected), analyze (with/without smart_hint), map end-to-end for a portrait-style and a scene-style synthetic JPEG, jobs status, panel composed/guides PNG retrieval, and ZIP download structure (print/*.png, guides/*.png, mockup/contact_sheet.png, mapping_manifest.json, quality_report.json, mapping_process_log.txt). All 22 tests PASSED against the public URL from frontend/.env (https://garment-ai-map.preview.emergentagent.com). Smart-hint graceful degradation confirmed even with LLM budget exhausted. Note: the review spec referenced a different preview URL (42fc6f0c-...); the actual REACT_APP_BACKEND_URL is garment-ai-map.preview.emergentagent.com and both resolve correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/map & /api/jobs/{id}", "issue": "Response field `composed_panels` is returned as a LIST of panel keys (e.g. ['master_front','master_back','sleeves','hood','pocket_kangaroo_pocket']) rather than a dict. The review spec said it 'should include ... a pocket_ key' — this is satisfied, but if the frontend or API contract expects a dict/object keyed by panel name, this will break UI. Actual PNG data is served via /api/jobs/{job_id}/panel/{panel_key}?kind=composed|guides which works correctly."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Confirm whether `composed_panels` should be a dict of panel_key->metadata or the current list-of-keys shape — align with any UI/consumer contract.",
+    "The review request referenced preview URL 42fc6f0c-...emergentagent.com but frontend/.env is set to garment-ai-map.preview.emergentagent.com. No action needed unless main agent expected a specific host."
+  ],
+  "critical_code_review_comments": [
+    "server.py `_prune_jobs()` only prunes on POST /api/map — job store can grow unbounded if map is never called; consider prune on GET job endpoints too.",
+    "In-memory ARTWORK_STORE and JOB_STORE with no size cap; a busy instance could OOM. Consider LRU eviction or on-disk temp storage.",
+    "smart_hint failure is swallowed as {'error': str(e)} silently — good graceful degradation, but no server log warning; add logger.warning for observability.",
+    "`@app.on_event('shutdown')` is deprecated in newer FastAPI — consider lifespan handlers.",
+    "Content-type sniffing in /api/upload-artwork accepts anything if the header magic bytes match; consider verifying it opens with PIL before storing to reject truncated/corrupt files."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/__init__.py"
+  ],
+  "success_rate": {"backend": "100% (22/22)", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "none required — no auth on any endpoint",
+  "seed_data_creation": "Synthetic portrait & scene JPEGs generated in-test via PIL; no persistent seed data written.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend suite at /app/backend/tests/backend_test.py is deterministic and self-contained (builds its own JPEGs). Runs in ~26s with pytest-xdist (2 workers). Uses BASE_URL parsed from /app/frontend/.env. Product exercised: oversized_hoodie_design_template (validates pocket underlay path). If backend is hot-reloading during a test run, expect transient 502s — re-run once server is stable (uptime > few sec). LLM smart_hint returns an error field due to exhausted budget — expected.",
+  "rca of the issue": "N/A — no bugs found; only a minor shape observation on composed_panels."
+}

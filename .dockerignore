@@ -1,0 +1,12 @@
+**/__pycache__
+**/*.pyc
+node_modules
+frontend/node_modules
+frontend/build
+.git
+.emergent
+.venv
+.env
+*.log
+/app/frontend/.env
+test_reports
