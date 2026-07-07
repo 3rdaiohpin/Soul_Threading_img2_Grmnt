@@ -16,6 +16,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw
 
+ALPHA_THRESHOLD = 8
+
 
 # Human labels for the visible pieces per template kind.
 # shape_01 in each template is the main/largest silhouette in this DB.
@@ -86,9 +88,9 @@ def _fit_contain(art: Image.Image, target_w: int, target_h: int) -> Image.Image:
     ratio = min(target_w / aw, target_h / ah)
     new_w = max(1, int(aw * ratio))
     new_h = max(1, int(ah * ratio))
-    resized = art.resize((new_w, new_h), Image.LANCZOS)
-    bg = Image.new("RGBA", (target_w, target_h), (255, 255, 255, 255))
-    bg.paste(resized, ((target_w - new_w) // 2, (target_h - new_h) // 2))
+    resized = art.resize((new_w, new_h), Image.LANCZOS).convert("RGBA")
+    bg = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))  # fully transparent
+    bg.paste(resized, ((target_w - new_w) // 2, (target_h - new_h) // 2), resized)
     return bg
 
 
@@ -122,32 +124,49 @@ def _load_shape_masks(db_root: Path, product_id: str, template_key: str) -> List
             idx = int(d.name[len(prefix):])
         except ValueError:
             continue
-        fb = d / "full_bleed.png"
-        if fb.exists():
-            m = Image.open(fb).convert("L")
-            m = _fill_mask(m)
-            result.append((idx, m))
+        # Prefer an explicit cut-shape mask with alpha if present
+        candidates = [
+            d / "full_bleed_cut_shape_mask.png",
+            d / "full_bleed_cut_shape_mask.webp",
+            d / "full_bleed.png",
+            d / "full_bleed_mask.png",
+        ]
+        fb = next((c for c in candidates if c.exists()), None)
+        if not fb:
+            continue
+        m_rgba = Image.open(fb).convert("RGBA")
+        # Extract/clean alpha channel (remove micro semi-transparent noise)
+        alpha = m_rgba.getchannel("A").point(lambda p: 255 if p > ALPHA_THRESHOLD else 0)
+        # Ensure we return an L mask for downstream operations
+        m_l = alpha.convert("L")
+        m_l = _fill_mask(m_l)
+        result.append((idx, m_l))
     return result
 
 
 def _extract_piece(composed_art: Image.Image, mask: Image.Image, pad: int = 8) -> Optional[Image.Image]:
     """Cut composed_art with the shape mask and crop to the mask's tight bbox."""
-    if composed_art.size != mask.size:
-        mask = mask.resize(composed_art.size, Image.LANCZOS)
-    arr = np.array(mask)
+    # Ensure mask is an L image representing the piece alpha
+    if mask.mode == "RGBA":
+        mask_alpha = mask.getchannel("A")
+    else:
+        mask_alpha = mask
+    if composed_art.size != mask_alpha.size:
+        mask_alpha = mask_alpha.resize(composed_art.size, Image.LANCZOS)
+    arr = np.array(mask_alpha)
     ys, xs = np.where(arr > 40)
     if len(xs) == 0:
         return None
     x0, x1 = int(xs.min()), int(xs.max())
     y0, y1 = int(ys.min()), int(ys.max())
-    # pad
+    # pad safely
     x0 = max(0, x0 - pad)
     y0 = max(0, y0 - pad)
     x1 = min(composed_art.size[0], x1 + pad)
     y1 = min(composed_art.size[1], y1 + pad)
-    # Apply mask to art (RGBA output on transparent bg)
+    # Apply mask alpha onto transparent RGBA canvas
     cut = Image.new("RGBA", composed_art.size, (0, 0, 0, 0))
-    cut.paste(composed_art.convert("RGBA"), (0, 0), mask)
+    cut.paste(composed_art.convert("RGBA"), (0, 0), mask_alpha)
     return cut.crop((x0, y0, x1, y1))
 
 
@@ -213,7 +232,7 @@ def compose_master(
         if placement.get("y_shift"):
             shift_px = int(target_h * placement["y_shift"])
             shifted = Image.new("RGBA", (target_w, target_h), (255, 255, 255, 0))
-            shifted.paste(art_layer, (0, shift_px))
+            shifted.paste(art_layer, (0, shift_px), art_layer)
             art_layer = shifted
 
         if key == "front_side":
