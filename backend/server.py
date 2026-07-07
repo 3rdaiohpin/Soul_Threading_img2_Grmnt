@@ -304,6 +304,8 @@ async def pod_submit(req: PODSubmitRequest):
         recipient=req.recipient,
         confirm=req.confirm,
     )
+    if "error" in submit_result:
+        raise HTTPException(502, {"provider": "printful", **submit_result})
     # persist minimal record
     entry.setdefault("pod_submissions", []).append(submit_result)
     return {"job_id": req.job_id, "garment_type": garment_type, "placements_sent": len(placements), **submit_result}

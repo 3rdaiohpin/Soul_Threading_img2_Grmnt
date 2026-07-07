@@ -1,39 +1,73 @@
 # Soul Threading · Smart AI IMG2Garment Mapper — PRD
 
-## Original Problem
-Build a Smart AI IMG2Garment Mapper: upload artwork, analyze subject/face/logos, classify archetype (portrait_hero / scene_wrap / abstract_wrap / logo_text_layout / product_object_layout), score 19 garment templates for fit, compose master front/back/sleeves/hood/pockets deterministically (Pillow, pocket underlay samples EXACT front region), validate quality gate, retry on failure, package ZIP with print PNGs, guides, mockup contact sheet, manifest, quality report, and process log.
+## Original problem statement
+Upload artwork → detect subject/face/text/saliency → classify archetype
+(portrait_hero / scene_wrap / abstract_wrap / logo_text_layout /
+product_object_layout) → score 19 garment templates → compose master
+front/back/sleeves/hood/pockets with **exact pocket underlay from front sample**
+→ validate → retry → package a print-ready ZIP (print PNGs, guide overlays,
+mockup contact sheet, manifest, quality report, process log). Deploy to
+Hugging Face Spaces AND Emergent. Full React UI required.
 
-## User Choices
-- Deployment: Hugging Face Spaces (GPU) + Emergent preview (CPU)
-- AI layer: CPU-safe fallback + Emergent LLM vision assist (Gemini 3 Flash) — deterministic Pillow/OpenCV compositor
-- Frontend: Full React dashboard
-- Scope: Full end-to-end MVP
+## Deployments live (Jan 2026)
+- **Emergent preview** — https://42fc6f0c-4bc4-4ff7-9160-1463a0778587.preview.emergentagent.com
+- **Hugging Face Space (private)** — https://huggingface.co/spaces/3rdaiOhpinFully/3rdaiOhpinFully
+  - Backend URL: https://3rdaiohpinfully-3rdaiohpinfully.hf.space (requires HF auth)
 
 ## Architecture
-- FastAPI backend (port 8001) — /app/backend/server.py + /app/backend/aop/*
-- 15 pipeline modules: database_loader, artwork_analyzer, model_manager, archetype_classifier, garment_fit_scorer, master_composer, hero_comfort_box + exclusion_zones + adjacency_graph, piece_deriver (in master_composer), pocket_underlay (in master_composer), validator, retry_controller (in validator), output_packager, process_logger, pipeline, vision_assist
-- 19-garment deterministic DB at /app/backend/aop_data (95 MB): garment_database.json, source_templates PNGs, analysis_masks, rules
-- React frontend — dark technical control-room dashboard, IBM Plex Sans + JetBrains Mono, industrial-amber accent
 
-## Implemented (2026-01-07)
-- All 15 core AOP modules with deterministic Pillow composition + pocket underlay sampling from exact front crop
-- CPU fallback stack: OpenCV Haar face, saliency FineGrained, MSER text, KMeans dominant colors
-- Emergent LLM vision assist for smart archetype hint (Gemini 3 Flash via emergentintegrations) — degrades gracefully when key budget exhausted
-- FastAPI endpoints: health, model-status, rules, garments, garments/{id}, template PNG serve, upload-artwork, analyze, map, jobs/{id}, jobs/{id}/panel/{key}, jobs/{id}/download
-- Full ZIP output: print/*.png, guides/*.png, mockup/contact_sheet.png, mapping_manifest.json, quality_report.json, mapping_process_log.txt
-- React UI: Upload dropzone, Analyze panel (heatmap + detections + colors + archetype scores), Garment Library grid with fit scores, Master Composition preview (composed/guides toggle), Quality Gauge with hard-fails, Process Log terminal, Model Manager sidebar, action bar with download
-- Backend testing: 22/22 pytest cases passed (deterministic pipeline + zip contents validated)
+### Backend (`/app/backend/`, FastAPI, ports 8001 dev / 7860 HF)
+- `server.py` — 15 REST routes under `/api/*`
+- `aop/` — 15 pipeline modules:
+  - `database_loader`, `artwork_analyzer`, `model_manager`
+  - `archetype_classifier`, `garment_fit_scorer`, `exclusion_zones`
+  - `master_composer` (deterministic Pillow + exact pocket underlay from front sample)
+  - `validator`, `retry_controller` (in `validator.py`)
+  - `output_packager`, `process_logger`, `pipeline` (orchestrator)
+  - `vision_assist` (Emergent LLM Gemini 3 Flash smart hint, non-blocking)
+  - `pod_printful` (Printful V2 draft/confirm order submission)
 
-## Backlog (P1)
-- Multi-garment batch mapping in one job
-- Save/browse previous jobs (MongoDB persistence)
-- Custom exclusion-zone editor per template
-- HF Spaces deployment package (requirements-ai.txt already staged in /tmp/artifacts/smart_ai)
+### Frontend (`/app/frontend/src/App.js`, React)
+Dark technical control-room dashboard, six panels + Model Manager sidebar +
+Printful modal.
 
-## Backlog (P2)
-- Real OWLv2/SAM2/CLIPSeg pipeline for HF GPU
-- Adjust retry controller with per-strategy scoring
-- Preset styles per archetype (contain vs cover, y-shift)
+### Data (`/app/backend/aop_data/`, 95 MB)
+19 garment templates × master front/back/sleeves/hood/pockets, per-piece
+analysis masks, universal deterministic ruleset.
 
-## Enhancement Idea
-Add a "share preview" that generates a public link with the mockup contact sheet + top 3 recommended garments — great for POD sellers to socialize designs before committing to production.
+## Endpoints
+- `GET /api/health`, `/api/model-status`, `/api/rules`
+- `GET /api/garments`, `/api/garments/{id}`, `/api/garments/{id}/template/{file}`
+- `POST /api/upload-artwork`, `POST /api/analyze`, `POST /api/map`
+- `GET /api/jobs/{id}`, `/api/jobs/{id}/panel/{key}?kind=composed|guides`, `/api/jobs/{id}/download`
+- **`GET /api/pod/status`** — configured / not configured
+- **`POST /api/pod/submit`** — Printful draft/confirm order
+- **`GET /api/pod/orders/{id}/status`** — poll fulfillment status
+
+## Implemented — Jan 2026
+- End-to-end pipeline validated on all 19 garments
+- **Iteration 2**: 24/24 backend tests + full frontend E2E; ActionBar/badge
+  overlap fixed
+- **Iteration 3**: Printful POD integration + garment library scroll fix +
+  code-review cleanups
+- 27/27 backend tests passing (100%)
+- Emergent LLM vision assist (Gemini 3 Flash) wired with graceful fallback
+- **Live on Hugging Face Spaces** (Docker SDK, port 7860) + Emergent preview
+
+## Runtime env
+- `MONGO_URL`, `DB_NAME`, `CORS_ORIGINS` (backend/.env)
+- `EMERGENT_LLM_KEY` (optional; smart hint)
+- `PRINTFUL_API_TOKEN` (optional; POD fulfillment)
+- `PUBLIC_BASE_URL` (required for POD — Printful must reach panel URLs)
+
+## Backlog
+- P1: MongoDB job persistence (currently in-memory, 1h TTL)
+- P1: Live SSE process-log streaming
+- P1: `/api/pod/variants` — pull live Printful catalog to reduce hardcoded map drift
+- P2: True GPU smart layer on HF (OWLv2 / SAM2 / RetinaFace)
+- P2: Left/right sleeve mirroring for directional artwork
+- P2: Batch mode — one artwork across multiple garments
+- P3: Auth + team workspaces
+
+## Test credentials
+None. No auth.

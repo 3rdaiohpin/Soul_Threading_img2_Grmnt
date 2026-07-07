@@ -418,7 +418,8 @@ function QualityGauge({ job, podStatus, onOpenPOD }) {
   const pass = q.passed;
   return (
     <Panel title="05 · Quality Gate" subtitle={`overall ${overall} / 100 · ${pass ? "PASS" : "FAIL"}`} testId="panel-quality">
-      <div className="flex flex-col gap-3 h-full">
+      <div className="flex flex-col h-full">
+        <div className="flex-1 min-h-0 overflow-y-auto scrollarea pr-1 space-y-3">
         <div className="flex items-center gap-3">
           <div className="relative w-20 h-20 shrink-0" data-testid="quality-overall">
             <svg viewBox="0 0 36 36" className="w-full h-full">
@@ -460,8 +461,9 @@ function QualityGauge({ job, podStatus, onOpenPOD }) {
             <div className="mono text-[11px] text-[var(--st-text-2)]">no retry needed</div>
           )}
         </div>
+        </div>
         {q.passed && (
-          <div className="mt-1">
+          <div className="flex-shrink-0 pt-2 mt-2 border-t border-[var(--st-border)]">
             <button
               className="st-btn st-btn-primary w-full justify-center"
               onClick={onOpenPOD}
