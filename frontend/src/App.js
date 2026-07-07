@@ -260,7 +260,7 @@ function MasterPreview({ job }) {
   const [kind, setKind] = useState("composed");
   if (!job) {
     return (
-      <Panel title="04 · Master Composition" subtitle="deterministic Pillow · guides + safe zones" testId="panel-master">
+      <Panel title="04 · Print Pieces" subtitle="each piece · artwork cut to silhouette · no production lines" testId="panel-master">
         <div className="h-full flex items-center justify-center text-[var(--st-text-mut)] mono text-[11px]">
           select a garment and run map
         </div>
@@ -268,30 +268,37 @@ function MasterPreview({ job }) {
     );
   }
   const panels = job.composed_panels || [];
+  // build label map from plan
+  const labelByKey = {};
+  (job.plan || []).forEach((p) => {
+    if (p.piece_key && p.label) labelByKey[p.piece_key] = p.label;
+  });
   return (
     <Panel
-      title="04 · Master Composition"
-      subtitle={`${job.product_name} · ${job.archetype.archetype}`}
+      title="04 · Print Pieces"
+      subtitle={`${panels.length} pieces · ${job.product_name} · ${job.archetype.archetype}`}
       testId="panel-master"
       actions={
         <div className="flex items-center gap-1 border border-[var(--st-border)]">
-          <button data-testid="tab-composed" className={`px-2 py-1 text-[10px] mono ${kind === "composed" ? "bg-[var(--st-amber)] text-black" : "text-[var(--st-text-2)]"}`} onClick={() => setKind("composed")}>composed</button>
-          <button data-testid="tab-guides" className={`px-2 py-1 text-[10px] mono ${kind === "guides" ? "bg-[var(--st-amber)] text-black" : "text-[var(--st-text-2)]"}`} onClick={() => setKind("guides")}>guides</button>
+          <button data-testid="tab-composed" className={`px-2 py-1 text-[10px] mono ${kind === "composed" ? "bg-[var(--st-amber)] text-black" : "text-[var(--st-text-2)]"}`} onClick={() => setKind("composed")}>print</button>
+          <button data-testid="tab-guides" className={`px-2 py-1 text-[10px] mono ${kind === "guides" ? "bg-[var(--st-amber)] text-black" : "text-[var(--st-text-2)]"}`} onClick={() => setKind("guides")}>with guides</button>
         </div>
       }
     >
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 h-full overflow-y-auto scrollarea">
-        {panels.map((p) => (
-          <div key={p} className="st-panel-2 flex flex-col" data-testid={`master-panel-${p}`}>
-            <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--st-border)]">
-              <div className="mono text-[10px] uppercase">{p.replace(/_/g, " ")}</div>
-              <div className="mono text-[9px] text-[var(--st-text-mut)]">{kind}</div>
+      <div className="absolute inset-0 overflow-y-auto scrollarea p-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+          {panels.map((p) => (
+            <div key={p} className="st-panel-2 flex flex-col" data-testid={`master-panel-${p}`}>
+              <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--st-border)]">
+                <div className="mono text-[10px] uppercase tracking-wider text-[var(--st-text)]">{labelByKey[p] || p.replace(/_/g, " ")}</div>
+                <div className="mono text-[9px] text-[var(--st-text-mut)]">{kind}</div>
+              </div>
+              <div className="flex-1 min-h-[180px] checker relative">
+                <img src={`${API}/jobs/${job.job_id}/panel/${p}?kind=${kind}`} alt={p} className="absolute inset-0 w-full h-full object-contain p-2" />
+              </div>
             </div>
-            <div className="flex-1 min-h-[140px] checker relative">
-              <img src={`${API}/jobs/${job.job_id}/panel/${p}?kind=${kind}`} alt={p} className="absolute inset-0 w-full h-full object-contain" />
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </Panel>
   );

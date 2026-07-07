@@ -289,17 +289,31 @@ class TestMap:
         panels = d["composed_panels"]
         # composed_panels may be a dict (keyed by panel) or a list of panel keys
         keys = list(panels.keys()) if isinstance(panels, dict) else list(panels)
-        assert "master_front" in keys
-        assert "master_back" in keys
-        assert "sleeves" in keys or any(k.startswith("sleeve") for k in keys)
-        assert "hood" in keys or any(k.startswith("hood") for k in keys)
-        assert any(k.startswith("pocket") for k in keys), f"no pocket_* key in {keys}"
+        # NEW: per-piece keys — hoodie should have all main pieces
+        expected_pieces = [
+            "front_body", "back_body", "right_sleeve", "left_sleeve",
+            "hood_outer", "hood_inner", "kangaroo_pocket",
+        ]
+        missing = [p for p in expected_pieces if p not in keys]
+        assert not missing, f"missing pieces {missing}; got {keys}"
         qr = d["quality_report"]
         assert "overall" in qr and 0 <= qr["overall"] <= 100
         assert "passed" in qr
         assert "retry" in d or "retry_info" in d
         assert "process_log" in d and isinstance(d["process_log"], list)
         assert d.get("output_zip_bytes_len", 0) > 0
+        # NEW: plan must contain per-piece entries with piece_key/label/template_key/shape_index
+        plan = d.get("plan", [])
+        assert isinstance(plan, list) and len(plan) > 0
+        # collect plan piece_keys
+        plan_keys = {p.get("piece_key") for p in plan if isinstance(p, dict)}
+        for exp in expected_pieces:
+            assert exp in plan_keys, f"plan missing entry for piece_key={exp}"
+        # spot-check structure of one plan entry
+        one = next(p for p in plan if p.get("piece_key") == "front_body")
+        assert "label" in one and isinstance(one["label"], str)
+        assert "template_key" in one and isinstance(one["template_key"], str)
+        assert "shape_index" in one and isinstance(one["shape_index"], int)
 
     def test_map_unknown_product(self, session, portrait_art_id):
         r = session.post(
@@ -342,7 +356,7 @@ class TestJobs:
     def test_panel_composed(self, session, hoodie_map_result):
         job_id = hoodie_map_result["job_id"]
         r = session.get(
-            f"{BASE_URL}/api/jobs/{job_id}/panel/master_front",
+            f"{BASE_URL}/api/jobs/{job_id}/panel/front_body",
             params={"kind": "composed"},
             timeout=TIMEOUT_SHORT,
         )
@@ -353,12 +367,38 @@ class TestJobs:
     def test_panel_guides(self, session, hoodie_map_result):
         job_id = hoodie_map_result["job_id"]
         r = session.get(
-            f"{BASE_URL}/api/jobs/{job_id}/panel/master_front",
+            f"{BASE_URL}/api/jobs/{job_id}/panel/front_body",
             params={"kind": "guides"},
             timeout=TIMEOUT_SHORT,
         )
         assert r.status_code == 200
         assert r.headers.get("content-type", "").startswith("image/png")
+
+    # NEW: verify piece silhouette is FILLED (center pixel opaque) not outline-only
+    @pytest.mark.parametrize("piece", ["front_body", "back_body", "right_sleeve", "left_sleeve"])
+    def test_piece_center_opaque(self, session, hoodie_map_result, piece):
+        from PIL import Image as _Image
+        import io as _io
+        job_id = hoodie_map_result["job_id"]
+        r = session.get(
+            f"{BASE_URL}/api/jobs/{job_id}/panel/{piece}",
+            params={"kind": "composed"},
+            timeout=TIMEOUT_SHORT,
+        )
+        assert r.status_code == 200, f"{piece} panel not found"
+        im = _Image.open(_io.BytesIO(r.content)).convert("RGBA")
+        w, h = im.size
+        # Sample a small window around center; consider opaque if any pixel alpha>=200
+        opaque_seen = False
+        for dx in range(-6, 7, 2):
+            for dy in range(-6, 7, 2):
+                px = im.getpixel((w // 2 + dx, h // 2 + dy))
+                if px[3] >= 200:
+                    opaque_seen = True
+                    break
+            if opaque_seen:
+                break
+        assert opaque_seen, f"{piece} center is transparent -> silhouette is outline-only (regression)"
 
     def test_download_zip_structure(self, session, hoodie_map_result):
         job_id = hoodie_map_result["job_id"]
@@ -375,6 +415,18 @@ class TestJobs:
         assert "mapping_manifest.json" in names
         assert "quality_report.json" in names
         assert "mapping_process_log.txt" in names
+        # NEW: verify per-piece PNGs are present in print/ for hoodie
+        expected_pieces = [
+            "front_body", "back_body", "right_sleeve", "left_sleeve",
+            "hood_outer", "hood_inner", "kangaroo_pocket",
+        ]
+        for pk in expected_pieces:
+            assert f"print/{pk}.png" in names, f"print/{pk}.png missing from zip"
+        # manifest lists all pieces
+        manifest = json.loads(zf.read("mapping_manifest.json"))
+        prints_in_manifest = set(manifest.get("output_files", {}).get("print", []))
+        for pk in expected_pieces:
+            assert f"print/{pk}.png" in prints_in_manifest, f"manifest missing print/{pk}.png"
 
     def test_job_not_found(self, session):
         r = session.get(f"{BASE_URL}/api/jobs/nonexistent_job/", timeout=TIMEOUT_SHORT)
@@ -420,7 +472,7 @@ class TestArchetypeDeterminism:
         assert 0 <= d["quality_report"]["overall"] <= 100
         panels = d["composed_panels"]
         keys = list(panels.keys()) if isinstance(panels, dict) else list(panels)
-        assert "master_front" in keys
+        assert "front_body" in keys
 
 
 # ---------------------------------------------------------------------------
@@ -490,8 +542,8 @@ class TestAdditionalGarments:
         assert d["product_id"] == pid
         panels = d["composed_panels"]
         keys = list(panels.keys()) if isinstance(panels, dict) else list(panels)
-        # front OR back — cargo shorts only has back panels
-        assert ("master_front" in keys) or ("master_back" in keys), keys
+        # NEW: front_body OR back_body must appear (some garments only expose one)
+        assert ("front_body" in keys) or ("back_body" in keys), keys
         # verify job is downloadable
         job_id = d["job_id"]
         r2 = session.get(f"{BASE_URL}/api/jobs/{job_id}/download", timeout=TIMEOUT_LONG)
@@ -501,3 +553,6 @@ class TestAdditionalGarments:
         names = zf.namelist()
         assert "mapping_manifest.json" in names
         assert "quality_report.json" in names
+        # NEW: each key in composed_panels must have a print/<key>.png
+        for k in keys:
+            assert f"print/{k}.png" in names, f"missing print/{k}.png for {pid}"
