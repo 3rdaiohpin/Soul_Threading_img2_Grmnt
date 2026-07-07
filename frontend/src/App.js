@@ -60,15 +60,15 @@ function Header({ modelStatus }) {
 
 function Panel({ title, subtitle, children, actions, testId, className = "", padded = true }) {
   return (
-    <section className={`st-panel flex flex-col ${className}`} data-testid={testId}>
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--st-border)]">
+    <section className={`st-panel flex flex-col ${className}`} data-testid={testId} style={{ height: "100%" }}>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--st-border)] flex-shrink-0">
         <div className="flex flex-col leading-tight">
           <div className="st-label">{title}</div>
           {subtitle && <div className="mono text-[10px] text-[var(--st-text-mut)] mt-0.5">{subtitle}</div>}
         </div>
         {actions}
       </div>
-      <div className={`${padded ? "p-3" : ""} flex-1 min-h-0`}>{children}</div>
+      <div className={`${padded ? "p-3" : ""} flex-1 min-h-0 relative`}>{children}</div>
     </section>
   );
 }
@@ -210,41 +210,45 @@ function GarmentGrid({ garments, scored, selected, onSelect }) {
   }, [scored]);
 
   return (
-    <Panel title="03 · Garment Library" subtitle={`${garments?.length || 0} templates · fit-scored against archetype`} testId="panel-garments" padded={false}>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-[var(--st-border)] overflow-y-auto scrollarea h-full">
-        {(garments || []).map((g) => {
-          const s = scoreMap[g.product_id];
-          const isSel = selected === g.product_id;
-          return (
-            <button
-              key={g.product_id}
-              onClick={() => onSelect(g.product_id)}
-              data-testid={`garment-tile-${g.product_id}`}
-              className={`text-left p-2.5 bg-[var(--st-surface)] hover:bg-[var(--st-surface-2)] transition-colors ${isSel ? "outline outline-1 outline-[var(--st-amber)]" : ""}`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="text-[11px] font-semibold leading-tight">{g.display_name.replace(/-Design-Template/gi, "").replace(/-/g, " ")}</div>
-                {s && (
-                  <div className="mono text-[10px] px-1.5 py-0.5 border border-[var(--st-border)]" style={{ color: s.composite_score >= 75 ? "var(--st-green)" : s.composite_score >= 60 ? "var(--st-amber)" : "var(--st-text-2)" }}>
-                    {s.composite_score.toFixed(0)}
+    <Panel title="03 · Garment Library" subtitle={`${garments?.length || 0} templates · scroll to see all · fit-scored against archetype`} testId="panel-garments" padded={false}>
+      <div className="relative w-full h-full">
+        <div className="absolute inset-0 overflow-y-scroll scrollarea" data-testid="garment-scroller">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-[var(--st-border)]">
+            {(garments || []).map((g) => {
+              const s = scoreMap[g.product_id];
+              const isSel = selected === g.product_id;
+              return (
+                <button
+                  key={g.product_id}
+                  onClick={() => onSelect(g.product_id)}
+                  data-testid={`garment-tile-${g.product_id}`}
+                  className={`text-left p-2.5 bg-[var(--st-surface)] hover:bg-[var(--st-surface-2)] transition-colors ${isSel ? "outline outline-2 outline-[var(--st-amber)] -outline-offset-2" : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-[11px] font-semibold leading-tight">{g.display_name.replace(/-Design-Template/gi, "").replace(/-/g, " ")}</div>
+                    {s && (
+                      <div className="mono text-[10px] px-1.5 py-0.5 border border-[var(--st-border)]" style={{ color: s.composite_score >= 75 ? "var(--st-green)" : s.composite_score >= 60 ? "var(--st-amber)" : "var(--st-text-2)" }}>
+                        {s.composite_score.toFixed(0)}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div className="mono text-[9px] text-[var(--st-text-mut)] mt-1 uppercase tracking-wide">{g.garment_type.replace(/_/g, " ")}</div>
-              <div className="mono text-[9px] text-[var(--st-text-2)] mt-1 flex gap-1 flex-wrap">
-                <span className="border border-[var(--st-border)] px-1">{g.piece_count} pcs</span>
-                {g.has_front && <span className="border border-[var(--st-border)] px-1">front</span>}
-                {g.has_back && <span className="border border-[var(--st-border)] px-1">back</span>}
-                {g.has_pocket && <span className="border border-[var(--st-border)] px-1 text-[var(--st-cyan)]">pkt</span>}
-                {g.has_hood && <span className="border border-[var(--st-border)] px-1">hood</span>}
-                {g.has_sleeves && <span className="border border-[var(--st-border)] px-1">slv</span>}
-              </div>
-              {s?.preferred_for_archetype && (
-                <div className="mono text-[9px] text-[var(--st-amber)] mt-1">★ recommended</div>
-              )}
-            </button>
-          );
-        })}
+                  <div className="mono text-[9px] text-[var(--st-text-mut)] mt-1 uppercase tracking-wide">{g.garment_type.replace(/_/g, " ")}</div>
+                  <div className="mono text-[9px] text-[var(--st-text-2)] mt-1 flex gap-1 flex-wrap">
+                    <span className="border border-[var(--st-border)] px-1">{g.piece_count} pcs</span>
+                    {g.has_front && <span className="border border-[var(--st-border)] px-1">front</span>}
+                    {g.has_back && <span className="border border-[var(--st-border)] px-1">back</span>}
+                    {g.has_pocket && <span className="border border-[var(--st-border)] px-1 text-[var(--st-cyan)]">pkt</span>}
+                    {g.has_hood && <span className="border border-[var(--st-border)] px-1">hood</span>}
+                    {g.has_sleeves && <span className="border border-[var(--st-border)] px-1">slv</span>}
+                  </div>
+                  {s?.preferred_for_archetype && (
+                    <div className="mono text-[9px] text-[var(--st-amber)] mt-1">★ recommended</div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </Panel>
   );
@@ -496,14 +500,14 @@ export default function App() {
           </div>
         </div>
         {/* RIGHT COLUMN */}
-        <div className="col-span-3 flex flex-col gap-px bg-[var(--st-border)] min-h-0">
-          <div className="flex-[1_1_0%] min-h-0 bg-[var(--st-bg)]">
+        <div className="col-span-3 flex flex-col gap-px bg-[var(--st-border)] min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-[340px] bg-[var(--st-bg)] relative">
             <GarmentGrid garments={garments} scored={analysis?.all_scored} selected={selected} onSelect={setSelected} />
           </div>
-          <div className="flex-shrink-0 bg-[var(--st-bg)]">
+          <div className="flex-shrink-0 h-[260px] bg-[var(--st-bg)]">
             <QualityGauge job={job} />
           </div>
-          <div className="flex-shrink-0 h-[200px] bg-[var(--st-bg)]">
+          <div className="flex-shrink-0 h-[180px] bg-[var(--st-bg)]">
             <ProcessLog logs={job?.process_log} />
           </div>
         </div>
