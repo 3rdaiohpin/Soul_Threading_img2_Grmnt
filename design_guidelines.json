@@ -1,0 +1,108 @@
+{
+  "project_name": "Soul Threading Smart AI IMG2Garment Mapper",
+  "theme": "Dark",
+  "archetype": "4 (Swiss & High-Contrast) adapted for Dark Mode Technical Software",
+  "aesthetic_notes": "Precise, technical, engineering-grade dashboard. Inspired by professional software like Blender, DaVinci Resolve, and Substance Painter. Absolutely NO purple gradients or 'AI slop'.",
+  "typography": {
+    "font_families": {
+      "heading": "IBM Plex Sans, sans-serif",
+      "body": "IBM Plex Sans, sans-serif",
+      "monospace": "JetBrains Mono, monospace"
+    },
+    "hierarchy": {
+      "h1": "text-2xl font-bold tracking-tight",
+      "h2": "text-xl font-semibold tracking-tight",
+      "h3": "text-sm font-semibold tracking-wide uppercase",
+      "body": "text-sm",
+      "label": "text-xs font-semibold tracking-[0.1em] uppercase text-slate-400",
+      "data": "font-mono text-sm",
+      "terminal_log": "font-mono text-xs leading-relaxed"
+    }
+  },
+  "colors": {
+    "background": {
+      "base": "#0B0C10",
+      "surface": "#12141A",
+      "surface_elevated": "#1A1D24",
+      "panel": "#22262F"
+    },
+    "text": {
+      "primary": "#E2E8F0",
+      "secondary": "#94A3B8",
+      "muted": "#64748B",
+      "on_accent": "#111111"
+    },
+    "accent": {
+      "primary": "#F5A623",
+      "primary_hover": "#D97706",
+      "secondary": "#06B6D4"
+    },
+    "semantic": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6",
+      "border": "#2E3340"
+    }
+  },
+  "layout_and_spacing": {
+    "grid_system": "Mode B: Control Room Grid. Highly dense, grid-cols-1 md:grid-cols-4 lg:grid-cols-12 with gap-1 or gap-px (using borders to separate).",
+    "spacing": "Generous internal panel padding (p-4 to p-6), but tight outer container gaps (gap-1 or gap-2) to maximize viewport usage. App should be h-screen overflow-hidden.",
+    "borders": "Grid Borders (Technical Look). Expose the skeleton. border-collapse style layout, 1px border-border/40 on all grid items.",
+    "radius": "Sharp edges. Use rounded-none or rounded-sm (max 2px). No pill-shaped buttons unless it's a specific toggle."
+  },
+  "components_strategy": {
+    "panels": "Flat backgrounds (#12141A), 1px solid border (#2E3340). No shadows.",
+    "buttons": "Rectangular, sharp. Primary: bg-[#F5A623] text-black. Secondary: transparent with 1px border.",
+    "inputs": "Shadcn customized. Flat, dark bg (#1A1D24), 1px border (#2E3340), focus:ring-1 focus:ring-[#F5A623].",
+    "gauges": "Data viz should use monochromatic layering or semantic colors (Cyan/Amber/Green) against dark backgrounds. Recharts is suitable.",
+    "terminal": "Black background (#000000 or #050508). Text: JetBrains Mono. Success logs in Green, errors in Red, processes in Amber/Cyan.",
+    "overlays": "Use solid/semi-solid dark backgrounds (bg-black/80) with backdrop-blur-xl for master composition previews."
+  },
+  "motion_and_interactions": {
+    "hover": "Subtle brightness increase (bg-slate-800/50).",
+    "focus": "High contrast ring (ring-1 ring-[#F5A623] ring-offset-1 ring-offset-[#0B0C10]).",
+    "transitions": "Instant or very fast (100ms-150ms ease). No bouncy or playful animations."
+  },
+  "icons_and_assets": {
+    "library": "Phosphor Icons (@phosphor-icons/react) for precise, geometric technical look. Default lucide-react is also acceptable if customized to sharp edges."
+  },
+  "image_urls": {
+    "garment_templates": [
+      {
+        "url": "https://images.pexels.com/photos/5420977/pexels-photo-5420977.jpeg",
+        "description": "Flat lay of blank paper sheets/pattern mock",
+        "usage": "Garment library grid placeholder for piece derivation"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1594587639708-095eb3778067",
+        "description": "Person holding green denim jacket",
+        "usage": "Garment mapping preview / archetype reference"
+      }
+    ],
+    "artwork_samples": [
+      {
+        "url": "https://images.unsplash.com/photo-1618331833071-ce81bd50d300?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMG1vZGVybiUyMHBhaW50aW5nJTIwYXJ0d29ya3xlbnwwfHx8fDE3ODE4ODYyMjB8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Blue white and yellow abstract painting",
+        "usage": "Example uploaded artwork in upload panel"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMG1vZGVybiUyMHBhaW50aW5nJTIwYXJ0d29ya3xlbnwwfHx8fDE3ODE4ODYyMjB8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Red blue and yellow abstract painting",
+        "usage": "Alternative artwork mapping example"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Install required fonts: IBM Plex Sans and JetBrains Mono (via Google Fonts in index.html, since this is a Vite/React .js app).",
+    "Install icon library: yarn add @phosphor-icons/react",
+    "Build a full-viewport (h-screen, overflow-hidden) dense workspace. Do not build a scrolling landing page.",
+    "Use a multi-panel grid layout. Left column: Upload & Garment Select. Center column: Master Preview & Derivation. Right column: Analytics, Quality Gauge, Terminal Log.",
+    "Strip all Shadcn components of large border radii. Use 'rounded-none' or max 'rounded-sm' (2px).",
+    "Use #F5A623 (Industrial Amber) strictly as the primary interaction/active state color. DO NOT use generic purple/indigo AI gradients.",
+    "Ensure the terminal process log streams in JetBrains Mono with distinct colors for different pipeline stages.",
+    "Add 'data-testid' to ALL interactive elements (buttons, inputs, selects, specific panels).",
+    "Maintain high contrast. Text must be readable against the dark #12141A panels.",
+    "Write components in .jsx/.js format, not .tsx."
+  ]
+}
