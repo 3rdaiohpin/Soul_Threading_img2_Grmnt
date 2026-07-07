@@ -421,3 +421,39 @@ class TestArchetypeDeterminism:
         panels = d["composed_panels"]
         keys = list(panels.keys()) if isinstance(panels, dict) else list(panels)
         assert "master_front" in keys
+
+
+# ---------------------------------------------------------------------------
+# Additional garment mappings called out by review: shorts & polo
+# ---------------------------------------------------------------------------
+class TestAdditionalGarments:
+    @pytest.mark.parametrize("pid", [
+        "cargo_loose_shorts_design_template",
+        "blade_collar_polo_shirt_design_template",
+    ])
+    def test_map_other_garments(self, session, scene_art_id, pid):
+        r = session.post(
+            f"{BASE_URL}/api/map",
+            json={
+                "artwork_id": scene_art_id,
+                "product_id": pid,
+                "use_smart_hint": False,
+            },
+            timeout=TIMEOUT_LONG,
+        )
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["product_id"] == pid
+        panels = d["composed_panels"]
+        keys = list(panels.keys()) if isinstance(panels, dict) else list(panels)
+        # front OR back — cargo shorts only has back panels
+        assert ("master_front" in keys) or ("master_back" in keys), keys
+        # verify job is downloadable
+        job_id = d["job_id"]
+        r2 = session.get(f"{BASE_URL}/api/jobs/{job_id}/download", timeout=TIMEOUT_LONG)
+        assert r2.status_code == 200
+        assert r2.headers.get("content-type", "").startswith("application/zip")
+        zf = zipfile.ZipFile(io.BytesIO(r2.content))
+        names = zf.namelist()
+        assert "mapping_manifest.json" in names
+        assert "quality_report.json" in names
