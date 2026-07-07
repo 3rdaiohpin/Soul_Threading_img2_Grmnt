@@ -2,26 +2,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import "@/App.css";
 import {
-  ArrowsClockwise,
   ArrowSquareOut,
-  Broom,
   CircleNotch,
   CloudArrowUp,
-  Cpu,
   Download,
-  FileZip,
-  GearSix,
   MagnifyingGlass,
-  Palette,
-  Package,
   Play,
-  Question,
   ShieldCheck,
   Sparkle,
-  Terminal,
   Warning,
   WarningOctagon,
-  X,
 } from "@phosphor-icons/react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
@@ -29,15 +19,14 @@ const API = `${BACKEND_URL}/api`;
 
 const LEVEL_CLASS = { INFO: "term-INFO", OK: "term-OK", WARN: "term-WARN", ERROR: "term-ERROR" };
 
-function usePolledFetch(url, deps = []) {
+function useOneShotFetch(url) {
   const [data, setData] = useState(null);
   useEffect(() => {
     let alive = true;
-    if (!url) return;
-    axios.get(url).then((r) => alive && setData(r.data)).catch(() => {});
+    if (!url) return () => { alive = false; };
+    axios.get(url).then((r) => { if (alive) setData(r.data); }).catch(() => {});
     return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [url]);
   return data;
 }
 
@@ -368,8 +357,8 @@ function ProcessLog({ logs }) {
       <div className="bg-black h-full overflow-y-auto scrollarea mono text-[11px] px-3 py-2" data-testid="process-log">
         {(logs || []).length === 0 ? (
           <div className="text-[var(--st-text-mut)]">terminal ready<span className="blink">_</span></div>
-        ) : logs.map((e, i) => (
-          <div key={i} className={`term-line ${LEVEL_CLASS[e.level] || ""}`}>
+        ) : logs.map((e) => (
+          <div key={`${e.ts}-${e.stage}-${e.message}`} className={`term-line ${LEVEL_CLASS[e.level] || ""}`}>
             <span className="text-[var(--st-text-mut)]">[{e.ts}]</span>{" "}
             <span className="font-semibold">{e.level}</span>{" "}
             <span className="text-[var(--st-text-mut)]">{e.stage.padEnd(12,' ')}</span>{" · "}
@@ -385,21 +374,21 @@ function ProcessLog({ logs }) {
 function ActionBar({ onMap, canMap, busy, job, selected }) {
   const downloadUrl = job ? `${API}/jobs/${job.job_id}/download` : "#";
   return (
-    <div className="border-t border-[var(--st-border)] px-4 py-2 flex items-center justify-between bg-[var(--st-surface)]">
-      <div className="mono text-[11px] text-[var(--st-text-2)]" data-testid="selection-summary">
+    <div className="border-t border-[var(--st-border)] px-4 py-2 flex items-center justify-between bg-[var(--st-surface)]" style={{ paddingRight: "220px", position: "relative", zIndex: 60 }}>
+      <div className="mono text-[11px] text-[var(--st-text-2)] truncate max-w-[45%]" data-testid="selection-summary">
         {selected ? <>target: <span className="text-[var(--st-text)]">{selected}</span></> : "no garment selected"}
         {job && <> · job <span className="text-[var(--st-amber)]">{job.job_id}</span> · panels <span className="text-[var(--st-text)]">{(job.composed_panels||[]).length}</span></>}
       </div>
       <div className="flex items-center gap-2">
-        <button className="st-btn" onClick={onMap} disabled={!canMap || busy} data-testid="btn-map">
-          {busy ? <CircleNotch size={12} className="animate-spin"/> : <Play size={12} weight="fill"/>}
-          run mapping
-        </button>
         {job && (
           <a className="st-btn st-btn-primary" href={downloadUrl} data-testid="btn-download">
             <Download size={12}/> download zip
           </a>
         )}
+        <button className="st-btn" onClick={onMap} disabled={!canMap || busy} data-testid="btn-map">
+          {busy ? <CircleNotch size={12} className="animate-spin"/> : <Play size={12} weight="fill"/>}
+          run mapping
+        </button>
       </div>
     </div>
   );
@@ -414,7 +403,7 @@ function ModelSidebar({ status }) {
         <div className="flex justify-between"><span className="text-[var(--st-text-2)]">smart_available</span><span>{String(status.smart_available)}</span></div>
         <div className="flex justify-between"><span className="text-[var(--st-text-2)]">torch</span><span>{String(status.torch_installed)}</span></div>
       </div>
-      <div className="p-2 space-y-1 overflow-y-auto scrollarea max-h-[220px]">
+      <div className="p-2 space-y-1 overflow-y-auto scrollarea flex-1 min-h-0">
         {status.detectors.map((d) => (
           <div key={d.name} className="flex items-start gap-2 text-[10px] mono">
             <span className={`mt-1 w-1.5 h-1.5 shrink-0 ${d.available ? "bg-[var(--st-green)]" : "bg-[var(--st-border)]"}`}></span>
@@ -439,10 +428,12 @@ export default function App() {
   const [analyzeBusy, setAnalyzeBusy] = useState(false);
   const [mapBusy, setMapBusy] = useState(false);
 
-  const modelStatus = usePolledFetch(`${API}/model-status`);
+  const modelStatus = useOneShotFetch(`${API}/model-status`);
 
   useEffect(() => {
-    axios.get(`${API}/garments`).then((r) => setGarments(r.data.items));
+    let alive = true;
+    axios.get(`${API}/garments`).then((r) => { if (alive) setGarments(r.data.items); }).catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   const doAnalyze = async () => {
@@ -506,13 +497,13 @@ export default function App() {
         </div>
         {/* RIGHT COLUMN */}
         <div className="col-span-3 flex flex-col gap-px bg-[var(--st-border)] min-h-0">
-          <div className="h-[320px] bg-[var(--st-bg)]">
+          <div className="flex-[1_1_0%] min-h-0 bg-[var(--st-bg)]">
             <GarmentGrid garments={garments} scored={analysis?.all_scored} selected={selected} onSelect={setSelected} />
           </div>
-          <div className="h-[260px] bg-[var(--st-bg)]">
+          <div className="flex-shrink-0 bg-[var(--st-bg)]">
             <QualityGauge job={job} />
           </div>
-          <div className="flex-1 min-h-0 bg-[var(--st-bg)]">
+          <div className="flex-shrink-0 h-[200px] bg-[var(--st-bg)]">
             <ProcessLog logs={job?.process_log} />
           </div>
         </div>
