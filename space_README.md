@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 pinned: false
 license: mit
-short_description: Smart AI mapper that turns artwork into production-ready AOP garment prints.
+short_description: "Smart AI mapper: artwork to production AOP garments."
 ---
 
 # Soul Threading · Smart AI IMG2Garment Mapper

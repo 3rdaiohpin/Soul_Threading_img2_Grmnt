@@ -424,6 +424,50 @@ class TestArchetypeDeterminism:
 
 
 # ---------------------------------------------------------------------------
+# POD (Printful) integration — verify graceful "not configured" behaviour
+# ---------------------------------------------------------------------------
+class TestPODNotConfigured:
+    """PRINTFUL_API_TOKEN is intentionally unset — endpoints must degrade nicely."""
+
+    def test_pod_status_not_configured(self, session):
+        r = session.get(f"{BASE_URL}/api/pod/status", timeout=TIMEOUT_SHORT)
+        assert r.status_code == 200
+        d = r.json()
+        assert d["configured"] is False
+        # provider is null when not configured
+        assert d.get("provider") in (None, "")
+        # note must mention required env vars
+        assert isinstance(d.get("note"), str) and len(d["note"]) > 0
+        assert "PRINTFUL_API_TOKEN" in d["note"]
+        # public_base_url may be null in this env (env not set)
+        assert "public_base_url" in d
+
+    def test_pod_submit_returns_503(self, session, hoodie_map_result):
+        job_id = hoodie_map_result["job_id"]
+        payload = {
+            "job_id": job_id,
+            "recipient": {
+                "name": "Test User",
+                "address1": "123 Test St",
+                "city": "Testville",
+                "country_code": "US",
+                "state_code": "CA",
+                "zip": "94000",
+            },
+            "confirm": False,
+        }
+        r = session.post(f"{BASE_URL}/api/pod/submit", json=payload, timeout=TIMEOUT_SHORT)
+        assert r.status_code == 503, r.text
+        detail = r.json().get("detail")
+        assert detail == "pod_not_configured", f"unexpected detail: {detail}"
+
+    def test_pod_order_status_returns_503(self, session):
+        r = session.get(f"{BASE_URL}/api/pod/orders/123/status", timeout=TIMEOUT_SHORT)
+        assert r.status_code == 503, r.text
+        assert r.json().get("detail") == "pod_not_configured"
+
+
+# ---------------------------------------------------------------------------
 # Additional garment mappings called out by review: shorts & polo
 # ---------------------------------------------------------------------------
 class TestAdditionalGarments:

@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 3 focused on the new Printful V2 POD integration + garment-scroller frontend fix. Added 3 new POD tests to /app/backend/tests/backend_test.py (TestPODNotConfigured). Full pytest suite: 27/27 passing (~34s) against public URL. Frontend E2E (viewport 1440x800) verified: garment-scroller has overflow-y:scroll with scrollHeight=810 > clientHeight=282, all 19 tiles present, zipper_cloak_design_template reachable after scrolling. Full pipeline (upload PNG -> analyze -> select oversized_hoodie -> map -> quality_report.passed=true) succeeds and the QualityGate panel renders btn-open-pod with label 'printful not configured', disabled=true, title='PRINTFUL_API_TOKEN not set'. btn-download also visible. No error toasts, no console errors. Previous ActionBar/branding-badge overlay bug from iteration_2 is fixed (paddingRight 220px + z-index 60 in ActionBar).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/pod/status", "issue": "When PRINTFUL_API_TOKEN is unset, response returns HTTP 200 with configured=false — this is by design (frontend polls it to decide whether to show POD UI). Consumers should check `configured` flag, not status code."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "QualityGate panel (05)", "issues": ["btn-open-pod is rendered at the bottom of the panel's scrollable body. On a 1440x800 viewport with a passed quality report, the button is present in the DOM and reachable via scroll, but is below the visible fold of the panel (panel body scrolls). Consider making the POD CTA a sticky footer inside the QualityGate panel so it is always visible when passed."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional design polish) Make btn-open-pod stick to the bottom of the QualityGate panel so it's always visible after a passing map without needing to scroll the panel body."
+  ],
+  "critical_code_review_comments": [
+    "backend/aop/pod_printful.py: _headers() accesses os.environ['PRINTFUL_API_TOKEN'] directly with [], which would KeyError if a race sets/unsets the env between is_configured() and the call. Use os.environ.get and re-check inside _headers, or short-circuit at is_configured() and pass the token as a parameter.",
+    "GARMENT_TO_CATALOG_VARIANT and PANEL_TO_PLACEMENT are hardcoded — Printful catalog IDs change; document that these are best-effort defaults and expose an /api/pod/variants endpoint that pulls the live catalog to reduce drift.",
+    "pod_printful.build_placements: 'sleeves' panel is duplicated to both left_sleeve + right_sleeve using the SAME image URL; if the original design has directional artwork (arrows, text) this will mirror incorrectly on one side. Flag or generate left/right variants.",
+    "pod_printful.create_and_submit_order: on non-2xx it returns a dict with 'error' but the endpoint /api/pod/submit still returns 200 with that dict — consider raising an HTTPException(502, ...) so the frontend sees a real failure.",
+    "server.py: PODSubmitRequest.recipient is Dict[str, Any] — no validation of required Printful fields (name/address1/city/country_code/zip). Failures will surface only as Printful API errors. Consider a Pydantic Recipient model.",
+    "server.py still uses deprecated @app.on_event('shutdown') (carried over from iteration_2)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (27/27)", "frontend": "100% — scroll + E2E flow + POD-not-configured UI all pass"},
+  "test_credentials": "none required — no auth",
+  "seed_data_creation": "Synthetic portrait PNG generated in-browser test via PIL, uploaded via /api/upload-artwork.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "POD integration is verified only for the NOT-configured code path (503 + configured=false + UI shows disabled button). To validate the happy path (real Printful order creation), a valid PRINTFUL_API_TOKEN and PUBLIC_BASE_URL must be set in backend/.env — the intent of this iteration was explicitly to keep it unset. Backend test file is at /app/backend/tests/backend_test.py; TestPODNotConfigured class covers all three POD endpoints. ActionBar overlay bug from iteration_2 is confirmed fixed. Iteration_2's MasterPreview `job.product_name` observation was not re-checked — frontend renders without error, so likely handled or field is now present.",
+  "rca of the issue": "No new bugs found in this iteration. Iteration_2's critical ActionBar overlap RCA is resolved by adding paddingRight:220px + zIndex:60 to the ActionBar in App.js line 506 — verified visually and behaviourally (btn-download and btn-map both render and click cleanly to the LEFT of the 'Made with Emergent' badge)."
+}

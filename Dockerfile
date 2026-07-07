@@ -1,6 +1,6 @@
 # Hugging Face Spaces – Docker SDK
 # Build: frontend once, then run FastAPI on port 7860 serving API + static SPA
-FROM node:18-slim AS frontend
+FROM node:20-slim AS frontend
 WORKDIR /build
 COPY frontend/package.json frontend/yarn.lock* ./
 RUN yarn install --frozen-lockfile --network-timeout 600000 || yarn install --network-timeout 600000
@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Python deps
 COPY backend/requirements.txt /tmp/req.txt
-RUN pip install --no-cache-dir -r /tmp/req.txt \
+RUN pip install --no-cache-dir --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ -r /tmp/req.txt \
  && pip install --no-cache-dir --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ emergentintegrations==0.2.0 || true
 
 # App code + data

@@ -7,9 +7,11 @@ import {
   CloudArrowUp,
   Download,
   MagnifyingGlass,
+  Package,
   Play,
   ShieldCheck,
   Sparkle,
+  Truck,
   Warning,
   WarningOctagon,
 } from "@phosphor-icons/react";
@@ -295,13 +297,123 @@ function MasterPreview({ job }) {
   );
 }
 
-function QualityGauge({ job }) {
+function PrintfulModal({ open, onClose, job, podStatus, onSubmitted }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [result, setResult] = useState(null);
+  const [form, setForm] = useState({
+    name: "Test Recipient",
+    address1: "123 Studio Ave",
+    city: "New York",
+    state_code: "NY",
+    country_code: "US",
+    zip: "10001",
+    confirm: false,
+    catalog_variant_id: "",
+  });
+
+  if (!open) return null;
+
+  const submit = async () => {
+    setBusy(true); setErr(null); setResult(null);
+    try {
+      const payload = {
+        job_id: job.job_id,
+        catalog_variant_id: form.catalog_variant_id ? Number(form.catalog_variant_id) : undefined,
+        confirm: form.confirm,
+        recipient: {
+          name: form.name, address1: form.address1, city: form.city,
+          state_code: form.state_code, country_code: form.country_code, zip: form.zip,
+        },
+      };
+      const r = await axios.post(`${API}/pod/submit`, payload);
+      setResult(r.data);
+      onSubmitted?.(r.data);
+    } catch (e) {
+      setErr(e?.response?.data?.detail || e.message);
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-8" onClick={onClose} data-testid="pod-modal">
+      <div className="st-panel w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--st-border)]">
+          <div>
+            <div className="st-label">Printful · POD Fulfillment</div>
+            <div className="mono text-[11px] text-[var(--st-text-mut)] mt-0.5">Job {job?.job_id} → Printful V2 draft order</div>
+          </div>
+          <button className="st-btn-ghost st-btn" onClick={onClose}>close</button>
+        </div>
+        <div className="p-4 space-y-3">
+          {!podStatus?.configured ? (
+            <div className="mono text-[11px] text-[var(--st-red)]">
+              PRINTFUL_API_TOKEN not set. Add it via Space Settings → Variables and secrets, then restart.
+            </div>
+          ) : !podStatus?.public_base_url ? (
+            <div className="mono text-[11px] text-[var(--st-amber)]">
+              PUBLIC_BASE_URL not set. Add it so Printful can fetch your print panels.
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-2 gap-2 mono text-[11px]">
+            {["name","address1","city","state_code","country_code","zip"].map((f) => (
+              <label key={f} className="flex flex-col gap-1">
+                <span className="st-label">{f}</span>
+                <input
+                  data-testid={`pod-field-${f}`}
+                  value={form[f]}
+                  onChange={(e) => setForm({ ...form, [f]: e.target.value })}
+                  className="bg-[var(--st-surface-2)] border border-[var(--st-border)] px-2 py-1 text-[12px] focus:outline-none focus:border-[var(--st-amber)]"
+                />
+              </label>
+            ))}
+            <label className="flex flex-col gap-1 col-span-2">
+              <span className="st-label">catalog_variant_id (optional override)</span>
+              <input
+                data-testid="pod-field-variant"
+                value={form.catalog_variant_id}
+                onChange={(e) => setForm({ ...form, catalog_variant_id: e.target.value })}
+                placeholder="auto-mapped from garment_type"
+                className="bg-[var(--st-surface-2)] border border-[var(--st-border)] px-2 py-1 text-[12px] focus:outline-none focus:border-[var(--st-amber)]"
+              />
+            </label>
+          </div>
+
+          <label className="flex items-center gap-2 mono text-[11px] cursor-pointer" data-testid="pod-confirm-toggle">
+            <input type="checkbox" className="accent-[var(--st-amber)]" checked={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.checked })} />
+            <span>confirm order (charges account · leave off to create a draft)</span>
+          </label>
+
+          {err && <div className="mono text-[11px] text-[var(--st-red)]" data-testid="pod-error">error: {String(err)}</div>}
+          {result && (
+            <div className="mono text-[11px] text-[var(--st-green)] space-y-1" data-testid="pod-result">
+              <div>printful_order_id · <span className="text-[var(--st-amber)]">{result.printful_order_id}</span></div>
+              <div>status · {result.status}</div>
+              {result.dashboard_url && (
+                <a href={result.dashboard_url} target="_blank" rel="noreferrer" className="text-[var(--st-cyan)] underline break-all">{result.dashboard_url}</a>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--st-border)]">
+          <button className="st-btn" onClick={onClose}>cancel</button>
+          <button className="st-btn st-btn-primary" onClick={submit} disabled={busy || !podStatus?.configured} data-testid="pod-submit-btn">
+            {busy ? <CircleNotch size={12} className="animate-spin" /> : <Truck size={12} />}
+            {form.confirm ? "submit + confirm" : "create draft"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QualityGauge({ job, podStatus, onOpenPOD }) {
   if (!job) return (
     <Panel title="05 · Quality Gate" subtitle="validator + retry controller" testId="panel-quality">
       <div className="h-full flex items-center justify-center text-[var(--st-text-mut)] mono text-[11px]">no run yet</div>
     </Panel>
-  );
-  const q = job.quality_report;
+  );  const q = job.quality_report;
   const overall = q.overall;
   const pass = q.passed;
   return (
@@ -348,6 +460,19 @@ function QualityGauge({ job }) {
             <div className="mono text-[11px] text-[var(--st-text-2)]">no retry needed</div>
           )}
         </div>
+        {q.passed && (
+          <div className="mt-1">
+            <button
+              className="st-btn st-btn-primary w-full justify-center"
+              onClick={onOpenPOD}
+              disabled={!podStatus?.configured}
+              data-testid="btn-open-pod"
+              title={podStatus?.configured ? "Send to Printful" : "PRINTFUL_API_TOKEN not set"}
+            >
+              <Truck size={12}/> {podStatus?.configured ? "send to printful" : "printful not configured"}
+            </button>
+          </div>
+        )}
       </div>
     </Panel>
   );
@@ -433,6 +558,8 @@ export default function App() {
   const [mapBusy, setMapBusy] = useState(false);
 
   const modelStatus = useOneShotFetch(`${API}/model-status`);
+  const podStatus = useOneShotFetch(`${API}/pod/status`);
+  const [podOpen, setPodOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -505,7 +632,7 @@ export default function App() {
             <GarmentGrid garments={garments} scored={analysis?.all_scored} selected={selected} onSelect={setSelected} />
           </div>
           <div className="flex-shrink-0 h-[260px] bg-[var(--st-bg)]">
-            <QualityGauge job={job} />
+            <QualityGauge job={job} podStatus={podStatus} onOpenPOD={() => setPodOpen(true)} />
           </div>
           <div className="flex-shrink-0 h-[180px] bg-[var(--st-bg)]">
             <ProcessLog logs={job?.process_log} />
@@ -513,6 +640,7 @@ export default function App() {
         </div>
       </div>
       <ActionBar onMap={doMap} canMap={!!artwork && !!selected} busy={mapBusy} job={job} selected={selected} />
+      <PrintfulModal open={podOpen} onClose={() => setPodOpen(false)} job={job} podStatus={podStatus} />
     </div>
   );
 }

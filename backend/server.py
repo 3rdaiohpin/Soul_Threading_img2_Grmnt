@@ -28,6 +28,7 @@ from aop.archetype_classifier import classify
 from aop.garment_fit_scorer import score_all
 from aop.pipeline import MapJob
 from aop.vision_assist import smart_hint as vision_smart_hint
+from aop import pod_printful
 
 # Mongo
 mongo_url = os.environ["MONGO_URL"]
@@ -247,6 +248,72 @@ async def job_download(job_id: str):
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="soul_threading_map_{job_id}.zip"'},
     )
+
+
+class PODSubmitRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    job_id: str
+    catalog_variant_id: Optional[int] = None
+    recipient: Dict[str, Any]
+    confirm: bool = False
+
+
+@api_router.get("/pod/status")
+async def pod_status():
+    configured = pod_printful.is_configured()
+    return {
+        "configured": configured,
+        "provider": "printful_v2" if configured else None,
+        "public_base_url": os.environ.get("PUBLIC_BASE_URL") or None,
+        "note": (
+            "Set PRINTFUL_API_TOKEN and PUBLIC_BASE_URL (public URL of this backend) "
+            "to enable auto-fulfillment. Printful V2 must be able to reach the print "
+            "panel URLs — the deployment must be publicly accessible."
+        ) if not configured else "ready",
+    }
+
+
+@api_router.post("/pod/submit")
+async def pod_submit(req: PODSubmitRequest):
+    if not pod_printful.is_configured():
+        raise HTTPException(503, "pod_not_configured")
+    entry = JOB_STORE.get(req.job_id)
+    if not entry:
+        raise HTTPException(404, "job not found")
+    result = entry["result"]
+    if not result.get("quality_report", {}).get("passed"):
+        raise HTTPException(422, "quality_gate_not_passed")
+
+    product = garment_db.product(result["product_id"])
+    garment_type = product.get("garment_type", "") if product else ""
+    variant = req.catalog_variant_id or pod_printful.suggest_variant_for(garment_type)
+    if not variant:
+        raise HTTPException(400, f"no catalog_variant_id and no default known for {garment_type}")
+
+    base = os.environ.get("PUBLIC_BASE_URL")
+    if not base:
+        raise HTTPException(400, "PUBLIC_BASE_URL not set — Printful cannot reach print panels")
+
+    placements = pod_printful.build_placements(result.get("composed_panels", []), base, req.job_id)
+    if not placements:
+        raise HTTPException(400, "no printable placements derived from job")
+
+    submit_result = await pod_printful.create_and_submit_order(
+        catalog_variant_id=variant,
+        placements=placements,
+        recipient=req.recipient,
+        confirm=req.confirm,
+    )
+    # persist minimal record
+    entry.setdefault("pod_submissions", []).append(submit_result)
+    return {"job_id": req.job_id, "garment_type": garment_type, "placements_sent": len(placements), **submit_result}
+
+
+@api_router.get("/pod/orders/{order_id}/status")
+async def pod_order_status(order_id: int):
+    if not pod_printful.is_configured():
+        raise HTTPException(503, "pod_not_configured")
+    return await pod_printful.get_order_status(order_id)
 
 
 app.include_router(api_router)
