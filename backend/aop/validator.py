@@ -1,6 +1,7 @@
-"""Validator + retry controller."""
+"""Validator + retry controller and alpha-mask validation helpers."""
 from __future__ import annotations
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
+from PIL import Image
 
 
 def _rect_intersect(a: Dict[str, int], b: Dict[str, int]) -> float:
@@ -99,3 +100,32 @@ def suggest_retry(report: Dict[str, Any], archetype: str) -> Dict[str, Any]:
     if archetype == "portrait_hero":
         adjustments.append("force_back_abstract")
     return {"needed": True, "adjustments": adjustments}
+
+
+# --- New helpers for alpha validation ---
+
+def validate_alpha_clipped_png(path: str) -> None:
+    """Raise ValueError if the PNG at path has no visible pixels or has no transparency."""
+    img = Image.open(path).convert("RGBA")
+    alpha = img.getchannel("A")
+    data = list(alpha.getdata())
+    opaque_pixels = sum(1 for p in data if p > 0)
+    transparent_pixels = sum(1 for p in data if p == 0)
+    if opaque_pixels == 0:
+        raise ValueError(f"Output has no visible pixels: {path}")
+    if transparent_pixels == 0:
+        raise ValueError(f"Output is still rectangular (mask not applied): {path}")
+
+
+def validate_composed_images(composed: Dict[str, Image.Image]) -> None:
+    """Validate in-memory composed images (raise ValueError on failure)."""
+    for key, img in composed.items():
+        rgba = img.convert("RGBA")
+        alpha = rgba.getchannel("A")
+        data = list(alpha.getdata())
+        opaque_pixels = sum(1 for p in data if p > 0)
+        transparent_pixels = sum(1 for p in data if p == 0)
+        if opaque_pixels == 0:
+            raise ValueError(f"Composed piece '{key}' has no visible pixels")
+        if transparent_pixels == 0:
+            raise ValueError(f"Composed piece '{key}' appears rectangular (no transparency): {key}")
